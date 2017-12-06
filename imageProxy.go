@@ -42,7 +42,7 @@ func isCreditsResponse(next http.Handler) http.Handler {
 		log.Println("Reading POST body...")
 		body, err := ioutil.ReadAll(r.Body)
 		if err != nil {
-			log.Println("Reading POST body... FAILED [%s]", err.Error());
+			log.Printf("Reading POST body... FAILED [%s]", err.Error());
 			message, status := middleware.GetErrorResponse(500, "Server unable to read body. " + err.Error())
 			http.Error(w, message, status)
 			return
@@ -53,7 +53,7 @@ func isCreditsResponse(next http.Handler) http.Handler {
 		log.Println("Creating image cache...")
 		err = ioutil.WriteFile("~tmp.jpeg", body, 0644)
 		if err != nil {
-			log.Println("Creating image cache... FAIL [%s]", err.Error())
+			log.Printf("Creating image cache... FAIL [%s]", err.Error())
 			message, status := middleware.GetErrorResponse(500, "Server unable to create image cache." + err.Error())
 			http.Error(w, message, status)
 			return
@@ -66,7 +66,7 @@ func isCreditsResponse(next http.Handler) http.Handler {
 		cmd.Stdout = &out
 		err = cmd.Run()
 		if err != nil {
-			log.Println("Executing python tf command... FAILED [%s]", err.Error())
+			log.Printf("Executing python tf command... FAILED [%s]", err.Error())
 			message, status := middleware.GetErrorResponse(500, "Server unable to execute TensorFlow command. " + err.Error())
                         http.Error(w, message, status)
 		}
@@ -76,7 +76,7 @@ func isCreditsResponse(next http.Handler) http.Handler {
 		w.Header().Set("Content-Type", "text/html")
 		log.Println("Writing response body...")
 		if _, err = w.Write(out.Bytes()); err != nil {
-			log.Println("Writing response body... FAILED \n [%s]", err.Error())
+			log.Printf("Writing response body... FAILED \n [%s]", err.Error())
 			message, status := middleware.GetErrorResponse(500, "Server unable to write response body. " + err.Error())
                         http.Error(w, message, status)
 		}
