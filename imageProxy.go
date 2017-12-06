@@ -21,7 +21,6 @@ func startServer() {
 		Method:  "POST",
 		Handler: isCreditsHandler(middleware.IsRequestValid(isCreditsResponse(http.HandlerFunc(final))))}}
 	config := middleware.ConfigType{Port: 8080, Path: "/ai", Resources: resource}
-	middleware.AllowedOrigins = append(middleware.AllowedOrigins, "localhost")
 
 	middleware.StartServer(config)
 }
@@ -38,39 +37,51 @@ func isCreditsHandler(next http.Handler) http.Handler {
 
 func isCreditsResponse(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer next.ServeHTTP(w, r)
+
+		log.Println("Reading POST body...")
 		body, err := ioutil.ReadAll(r.Body)
 		if err != nil {
-			log.Fatal(err)
-			message, status := middleware.GetErrorResponse(500, "Server unable to read body.")
+			log.Println("Reading POST body... FAILED [%s]", err.Error());
+			message, status := middleware.GetErrorResponse(500, "Server unable to read body. " + err.Error())
 			http.Error(w, message, status)
+			return
 		}
 		ioutil.NopCloser(r.Body)
+		log.Println("Reading POST body... Done")
 
+		log.Println("Creating image cache...")
 		err = ioutil.WriteFile("~tmp.jpeg", body, 0644)
 		if err != nil {
-			log.Println("Create image cache... FAIL")
-			log.Fatal(err)
-			message, status := middleware.GetErrorResponse(500, "Server unable to create image cache.")
+			log.Println("Creating image cache... FAIL [%s]", err.Error())
+			message, status := middleware.GetErrorResponse(500, "Server unable to create image cache." + err.Error())
 			http.Error(w, message, status)
+			return
 		}
+		log.Println("Creating image cache... Done")
 
+		log.Println("Executing python tf command...")
 		cmd := exec.Command("python", "-m", "scripts.label_image", "--graph=tf_files/retrained_graph.pb", "--image=~tmp.jpeg")
 		var out bytes.Buffer
 		cmd.Stdout = &out
 		err = cmd.Run()
 		if err != nil {
-			log.Fatal(err)
+			log.Println("Executing python tf command... FAILED [%s]", err.Error())
+			message, status := middleware.GetErrorResponse(500, "Server unable to execute TensorFlow command. " + err.Error())
+                        http.Error(w, message, status)
 		}
+		log.Println("Executing python tf command... Done")
+
 		fmt.Printf("%q", out.String())
 		w.Header().Set("Content-Type", "text/html")
 		log.Println("Writing response body...")
 		if _, err = w.Write(out.Bytes()); err != nil {
-			log.Panicf("Writing response body... FAILED \n [%s]", err.Error())
+			log.Println("Writing response body... FAILED \n [%s]", err.Error())
+			message, status := middleware.GetErrorResponse(500, "Server unable to write response body. " + err.Error())
+                        http.Error(w, message, status)
 		}
 		log.Println("Writing response body... DONE")
 
 		os.Remove("~tmp.jpeg")
-
-		next.ServeHTTP(w, r)
 	})
 }
